@@ -1,17 +1,17 @@
 setwd("File Path")
 
-#Carregar as polaridades
-polaridades_palavras <- read_csv('polaridades_palavras.csv')
-stopwordslist <- read_csv('stopwords.csv')
-stopwordslist
-
-#Acessar Twitter 
+#Acessar Twitter Dev
 consumer_key <- "consumer key"
 consumer_secret <- "consumer password"
 access_token <- "access token"
 access_secret <- "access token password"
 
-twitter_tag <- "#bolsomito|#bolsonaro|#bolsolixo|#haddad|#elenao|#elesim"
+#Carregar uma lista de polaridades
+polaridades_palavras <- read_csv('polaridades_palavras.csv')
+stopwordslist <- read_csv('stopwords.csv')
+stopwordslist
+
+twitter_tags <- "#bolsomito|#bolsonaro|#bolsolixo|#haddad|#elenao|#elesim|#elenao|#elesim"
 
 # autorizar Twitter 
 setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret);
