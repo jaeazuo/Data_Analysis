@@ -6,11 +6,12 @@ consumer_secret <- "consumer password"
 access_token <- "access token"
 access_secret <- "access token password"
 
-#Carregar uma lista de polaridades
+#Carregar uma lista de polaridades que encontrei em fóruns e blogs online
 polaridades_palavras <- read_csv('polaridades_palavras.csv')
 stopwordslist <- read_csv('stopwords.csv')
 stopwordslist
 
+#Tags polarizadas
 twitter_tags <- "#bolsomito|#bolsonaro|#bolsolixo|#haddad|#elenao|#elesim|#elenao|#elesim"
 
 # autorizar Twitter 
@@ -35,7 +36,6 @@ tibble(tweetxtUtfUnique)
 
 #Criar um corpus 
 library(tm)
-
 tweetencoded <- sapply(tweetxtUtfUnique,enc2native)
 df <- data.frame(text=tweetencoded)
 head(df)
@@ -48,29 +48,27 @@ tm_corpus <- Corpus(DataframeSource(df))
 inspect(tm_corpus[1:4])
 
 #criar o dtm usando palavras que tem mais de 3 letras e uma frequencia >19
-
-
 dtm <- DocumentTermMatrix(tm_corpus, control=list(wordLengths=c(4, 20),language=locale('pt'), stopwords=stopwords('portuguese'),
                                                  bounds = list(global = c(30,500))))
-
 dtm
 
-#podemos ver os termos mais frequentes
+#Ver os termos mais frequentes
 findFreqTerms(dtm)
 
 ttm_results <- t(as.matrix(dtm)) %*% as.matrix(dtm)
 head(ttm_results)
 
-#Provavelmente você terá que instalar a package igraph se não tiver
+#Instalar o pacote igraph
 library(igraph)
-#construindo um grafico da matriz acima
+
+#construir um grafico da matriz acima
 g <- graph.adjacency(ttm_results, weighted=T, mode = 'undirected')
 g <- simplify(g)
 
-#setando o label e degree dos vertices
+#setar o label e degree dos vertices
 V(g)$label <- V(g)$name
 V(g)$degree <- degree(g)
-E(g)$color <- ifelse(E(g)$wheight > 15, "lightblue", "red")
+E(g)$color <- ifelse(E(g)$weight > 15, "blue", "red")
 
 set.seed(2000)
 layout1 <- layout_on_sphere(g)
@@ -79,7 +77,7 @@ layout1 <- layout_on_sphere(g)
 #plot(g, layout=layout.kamada.kawai)
 plot(g, layout=layout.fruchterman.reingold)
 
-#melhorando a apresentação de acordo com o peso dos termos
+#melhorar a apresentação de acordo com o peso dos termos
 V(g)$label.cex <- 2.2 * V(g)$degree / max(V(g)$degree)+ .2
 V(g)$label.color <- rgb(0, 0, .2, .8)
 V(g)$frame.color <- NA
@@ -88,24 +86,21 @@ E(g)$color <- rgb(.5, .5, 0, egam)
 E(g)$width <- egam
 plot(g, layout=layout1)
 
-#Apresentarei a vocês agora uma outra maneira de criar matrizes de termo e documentos
-#Note que no quanteda não precisa fazer um encode de todo o texto
+#Criar matrizes de termo e documentos
+
+#No quanteda não precisa fazer um encode de todo o texto
 library(quanteda)
-#vou qualificar os dados para futuramente fazer alguma coisa com isso
+
+#Qualificar os dados para futuramente fazer alguma coisa com isso
 twdf <- tibble(tweet = tweetxtUtfUnique)
 twdf$whois <- NA
-twdf$whois[twdf$tweet %like% 'facebook'] <- 'facebook'
-twdf$whois[twdf$tweet %like% 'microsoft'] <- 'microsoft'
-twdf$whois[twdf$tweet %like% 'google'] <- 'google'
-twdf$whois[twdf$tweet %like% 'apple'] <- 'apple'
-twdf$whois[twdf$tweet %like% 'amazon'] <- 'amazon'
-twdf$whois[twdf$tweet %like% 'linkedin'] <- 'linkedin'
+twdf$whois[twdf$tweet %like% 'bolsonaro'] <- 'bolsonaro'
+twdf$whois[twdf$tweet %like% 'haddad'] <- 'haddad'
 twdf$whois[is.na(twdf$whois) ] <- 'semtag'
 freq <- twdf %>% count(whois, sort = T) %>% select( whois,freq = n) 
 freq
 
 barplot(table(twdf$whois))
-
 
 distMatrix <- as.matrix(dist(freq$freq))
 plot(density(distMatrix))
@@ -115,19 +110,18 @@ dfq <- data.frame(id=row.names(twdf),
                   text=twdf$tweet, whois = factor(twdf$whois))
 
 myCorpus <- corpus(twdf,  text_field = 'tweet', 
-                   metacorpus = list(source = "tweets da amazon, google e microsoft")) 
+                   metacorpus = list(source = "tweets do bolsonaro e do haddad")) 
 myCorpus
 
 head(textstat_readability(myCorpus),2)
 
 
-#observando
+#observar os resultos
 summary(myCorpus,6)
 
-#para acessar qq parte da matriz use a função texts
+#acessar qualquer parte da matriz com a função texts
 texts(myCorpus)[28:30]
-
-summary(corpus_subset(myCorpus, whois == 'amazon'),6)
+summary(corpus_subset(myCorpus, whois == 'bolsonaro'),6)
 
 #A função kwic (keywords in context) procura o texto e nos mostra uma forma visual da matrix
 kwic(myCorpus,'virtual')
@@ -138,7 +132,8 @@ temptok <- tokens(tweetxtUtfUnique)
 temptok[1:5]
 
 remove(temptok)
-#Agora vamos usar a principal funçao do quanteda a dfm, que transforma o corpus em um 
+
+#Usar a principal funçao do quanteda a dfm, que transforma o corpus em um 
 #documento termo matriz e ao contrario da funçao tokens ela aplica varios funções de limpeza como
 #retirar pontuação, converter para minusculo, para saber mais consulte a documentação
 myDfm <- dfm(myCorpus, stem = F)
@@ -147,20 +142,21 @@ myDfm
 topfeatures(myDfm,20)
 
 
-stopwors2 <- c('the','r','é','c','?','!','of','rt','pra')
+stopwors2 <- c('the','r','é','c','?','!','of','rt','pra','pq', 'qd', 'mds')
 myDfm <- dfm(myCorpus, groups='whois', remove = c(quanteda::stopwords("portuguese"),stopwors2,tm::stopwords('portuguese')), 
                  stem = F, remove_punct = TRUE)
-#note que com a opão groups ele agrupou pela nossa classificação
+                 
+#Usar a opcão groups para agrupar pela minha classificação
 myDfm
 
-## para acessar os termos mais usados
+#Acessar os termos mais usados
 topfeatures(myDfm, 20) 
 
-#e finalmente chegamos na nossa já conhecida wordcloud
+#Wordcloud
 set.seed(100)
 textplot_wordcloud(myDfm, min.freq = 15, random.order = FALSE,
                    rot.per = .6, 
-                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+                   colors = RColorBrewer::brewer.pal(8,"Dark"))
                    
 #Frequencia do texto 
 allfeats <- textstat_frequency(myDfm)
@@ -170,7 +166,7 @@ ggplot(head(allfeats,20), aes(x=feature, y=frequency, fill=frequency)) + geom_ba
 xlab("Termos") + ylab("Frequência") + coord_flip() +
 theme(axis.text=element_text(size=7))
 
-#Quais os termos mais frequentes? 
+#Quais sao os termos mais frequentes? 
 col <- textstat_collocations(myCorpus , size = 2:4, min_count = 2)
 head(col)
 
@@ -180,36 +176,34 @@ ggplot(col[order(col$count, decreasing = T),][1:25,],
 xlab("Expressões") + ylab("Frequência")  + coord_flip() +
 theme(axis.text=element_text(size=7))
 
-#Vendo as palavras relacionadas do agrupamentos que criamos
+#Ver as palavras relacionadas do agrupamentos que criei
 tstatkeyness <- textstat_keyness(myDfm, target = 'linkedin')
 head(tstatkeyness,15)
 
-#e agora plotando!
+#Plotar
 textplot_keyness(tstatkeyness)
 
 #dfm_sort(myDfm)[, 1:20]
 textstat_simil(myDfm, c('microsoft','linkedin'))
 
-## Plotando score wordfish(escala não supervisionada)
+##Plotar score wordfish(escala não supervisionada)
 wfm <- textmodel_wordfish(myDfm)
 textplot_scale1d(wfm)
 
 
-# plot estimated word positions, Plotando Escala 1D
+#Plotar estimated word positions, Escala 1D
 textplot_scale1d(wfm, margin = "features", 
-                 highlighted = c("google", "microsoft", "amazon", 
+                 highlighted = c("google", "microsoft", "bolsonaro", 
                                  "apple","linkedin"))
                                  
- #Plotando Xray
- textplot_xray(kwic(myCorpus[1:40], "microsoft"), 
-              kwic(myCorpus[1:40], "amazon"),
-              kwic(myCorpus[1:40], "facebook"),
-              kwic(myCorpus[1:40], "apple"))
+ #Plotar Xray
+ textplot_xray(kwic(myCorpus[1:40], "haddad"), 
+              kwic(myCorpus[1:40], "bolsonaro"),
               
-#Calculando a diversidade complexidade dos textos
+#Calcular a diversidade complexidade dos textos
 textstat_lexdiv(myDfm, "all",drop=T) %>% arrange(desc(U))
 
-#Exibindo colocations, fazendo um score de termos: Vamos pegar os tweets crus sem nenhum processo, apenas com encode
+#Exibir colocations, fazendo um score de termos; pegar os tweets crus sem nenhum processo, apenas com encode
 twraw <- readr::parse_character(tweetxt, locale = readr::locale('pt')) 
 mytoken <- tokens(twraw, 
                   remove_numbers=T,remove_symbols=T, 
@@ -219,7 +213,7 @@ head(mytoken)
 mytoken <- tokens_remove(mytoken, stopwords('portuguese'))
 head(textstat_collocations(mytoken,size = 5, min_count = 5))
 
-#Criando um grafico das relações entre as tags
+#Criar um grafico das relações entre as tags
 myrawCorpus <- corpus(twraw)
 tweetdfm <- dfm(myrawCorpus, remove_punct = TRUE)
 tagdfm <- dfm_select(tweetdfm, ('#*'))
@@ -232,14 +226,14 @@ head(tagfcm)
 toptagfcm <- fcm_select(tagfcm, toptag)
 textplot_network(toptagfcm, min_freq = 0.1, edge_alpha = 0.8, edge_size = 5)
 
-#Criando um grafico das relações de usuários
+#Criar um grafico das relações de usuários
 userdfm <- dfm_select(tweetdfm, ('@*'))
 topuser <- names(topfeatures(userdfm, 200))
 userfcm <- fcm(userdfm)
 userfcm <- fcm_select(userfcm, topuser)
 textplot_network(userfcm, min_freq = 0.1, edge_color = 'blue', edge_alpha = 0.8, edge_size = 5)
 
-#Criando um DTM com nossas polaridades como dicionario
+#Criar um DTM com nossas polaridades como dicionario
 positivas <- polaridades_pt %>% filter(sentimento == 'positivo') %>% select(word)
 negativas <- polaridades_pt %>% filter(sentimento == 'negativo') %>% select(word)
 
@@ -270,7 +264,7 @@ scorebygroup %>%
   ylab("Frequência por polaridade") +
   aes(fill= term,color = term) + scale_color_manual(values = c("red", "green"))
   
-  #Procurando por frequencia
+  #Procurar por frequencia
   bySentimento
   
   CreatePercentile <- function(x) {
@@ -286,20 +280,17 @@ scorebygroup %>%
     WordCoverage <- data.frame(Percentile, TextNum)
     return(WordCoverage)
 }
-facebookCorpus <- corpus_subset(myCorpus, whois=='facebook')
-googleCorpus <- corpus_subset(myCorpus, whois=='google')
-microsoftCorpus <- corpus_subset(myCorpus, whois=='microsoft')
+bolsonaroCorpus <- corpus_subset(myCorpus, whois=='bolsonaro')
+haddadCorpus <- corpus_subset(myCorpus, whois=='haddad')
 #teste <- dfm(myCorpus, dictionary = dic, groups = 'whois')
-facedfm <- dfm(facebookCorpus, stem = F)
-googledfm <- dfm(googleCorpus, stem = F)
-micdfm <- dfm(microsoftCorpus, stem=F)
-facefreq <- textstat_frequency(facedfm)
-googlefreq <- textstat_frequency(googledfm)
-micfreq <- textstat_frequency(micdfm)
-facecover <-CreatePercentile(facefreq)
-googlecover <-CreatePercentile(googlefreq)
-miccover <-CreatePercentile(micfreq)
+bolsofm <- dfm(bolsonaroCorpus, stem = F)
+haddadfm <- dfm(haddadCorpus, stem = F)
 
+bolsonarofreq <- textstat_frequency(bolsonarodfm)
+haddadfreq <- textstat_frequency(haddaddfm)
+
+bolsonarocover <-CreatePercentile(bolsonarofreq)
+haddadcover <-CreatePercentile(haddadfreq)
 
 faceg <- ggplot(facecover, aes(Percentile * 100, TextNum)) + geom_point() + 
     geom_line() + xlab("Cover") + ylab("# of Text ") + ggtitle("facebook")
